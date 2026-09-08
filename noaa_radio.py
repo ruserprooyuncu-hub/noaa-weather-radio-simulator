@@ -56,6 +56,11 @@ class NOAAWeatherRadio:
         
         self.station_ids = [self.station_id, "KXI60", "WNG555", "KXI58", "WNG640", "KEC61", "WNG638"]
         
+        # ============ TEST SİSTEMİ ============
+        self.test_mode = True
+        self.last_test_time = 0
+        self.last_test_type = ""
+        
         self.init_speaker()
         self.emergency_checked = False
     
@@ -209,13 +214,75 @@ class NOAAWeatherRadio:
             print(f"❌ Data error: {e}")
             return None
     
+    def clean_area(self, area):
+        """State kısaltmalarını temizle (örn: Lancaster, PA -> Lancaster)"""
+        if not area:
+            return "this area"
+        
+        area_clean = re.sub(r',\s*[A-Z]{2}\s*$', '', area)
+        area_clean = re.sub(r',\s*[A-Z]{2}\s*,', ',', area_clean)
+        area_clean = area_clean.strip()
+        
+        return area_clean
+    
     # ============================================================
     # 1. HARRY - OPENING
     # ============================================================
     def get_opening_message(self):
+        """İstasyona özel açılış metni - Sesine göre format değişir"""
+        
+        # Eğer özel açılış metni varsa onu kullan
         if self.custom_opening:
             return self.custom_opening
-        return f"This is NOAA Weather Radio Hazards, station {self.station_id} in {self.city}. The station broadcast from the National Weather Service, at the frequency of {self.frequency} Megahertz."
+        
+        # İstasyonun sesini al
+        voice = self.station.get("voice", "tom")
+        callsign = self.callsign
+        station_id = self.station_id
+        frequency = self.frequency
+        city = self.city
+        state = self.state
+        
+        # ============ TOM AÇILIŞ FORMATI ============
+        if voice == "tom":
+            openings = [
+                f"This is NOAA Weather Radio {station_id} originating from the National Weather Service forecast office in {city}, {state}. We supply the latest available information for the {city} area over station {station_id} on a frequency of {frequency} Megahertz.",
+                
+                f"You are listening to NOAA Weather Radio station {station_id}, broadcasting on a frequency of {frequency} Megahertz. This station is operated by the National Weather Service in {city}, {state}.",
+                
+                f"This is NOAA Weather Radio Station {station_id} in {city}, {state}. Broadcast Programming originates from the National Weather Service in {city}.",
+                
+                f"NOAA Weather Radio station {station_id} in {city}, {state}, broadcasting on a frequency of {frequency} Megahertz. This station is operated by the National Weather Service.",
+                
+                f"This is NOAA Weather Radio station {station_id} from the National Weather Service in {city}. We provide weather information for the {city} area on {frequency} Megahertz."
+            ]
+            return random.choice(openings)
+        
+        # ============ PAUL AÇILIŞ FORMATI ============
+        elif voice == "paul":
+            openings = [
+                f"This is NOAA Weather Radio station {station_id} in {city}, {state}, broadcasting on a frequency of {frequency} Megahertz.",
+                
+                f"This is NOAA Weather Radio Hazards, station {station_id} in {city}. The station broadcast from the National Weather Service, at the frequency of {frequency} Megahertz.",
+                
+                f"This is NOAA Weather Radio station {station_id}. We broadcast from the National Weather Service in {city}, {state} on {frequency} Megahertz.",
+                
+                f"You are listening to NOAA Weather Radio station {station_id} in {city}, {state}, transmitting on {frequency} Megahertz."
+            ]
+            return random.choice(openings)
+        
+        # ============ HARRY AÇILIŞ FORMATI ============
+        else:
+            openings = [
+                f"This is NOAA Weather Radio station {station_id} in {city}, broadcasting on a frequency of {frequency} Megahertz.",
+                
+                f"This is the NOAA Weather Radio {station_id} in {city}. {station_id} operates on a frequency of {frequency} Megahertz.",
+                
+                f"This is NOAA Weather Radio Hazards, station {station_id} in {city}, at the frequency of {frequency} Megahertz.",
+                
+                f"NOAA Weather Radio station {station_id} in {city}, {state}. Frequency {frequency} Megahertz."
+            ]
+            return random.choice(openings)
     
     # ============================================================
     # 2. PAUL - TIME ANNOUNCEMENT
@@ -241,9 +308,10 @@ class NOAAWeatherRadio:
         return f"The current time is {time_str} {tz}."
     
     # ============================================================
-    # 3. TOM - HOURLY ROUNDUP
+    # 3. TOM - HOURLY ROUNDUP (UZUN VE DETAYLI)
     # ============================================================
     def get_hourly_roundup(self, data):
+        """Saatlik hava durumu özeti - UZUN ve detaylı - TOM okur"""
         if not data:
             return "Hourly weather roundup not available."
         
@@ -284,14 +352,79 @@ class NOAAWeatherRadio:
                 if precip and precip > 0:
                     message_parts.append(f"There is a {int(precip)} percent chance of precipitation.")
         
+        # ============ UZUN DETAYLAR ============
+        # Nem
         humidity = random.randint(25, 75)
+        message_parts.append(f"Humidity is {humidity} percent.")
+        
+        # Çiy Noktası (Dew Point)
+        dew_point = random.randint(35, 65)
+        message_parts.append(f"The dew point is {dew_point} degrees Fahrenheit.")
+        
+        # Rüzgar Rüzgarları (Wind Gusts)
+        wind_gust = random.randint(15, 35)
+        message_parts.append(f"Wind gusts of up to {wind_gust} miles per hour are possible.")
+        
+        # Barometrik Basınç
         pressure = random.uniform(29.85, 30.25)
         pressure_trend = random.choice(['rising', 'falling', 'steady'])
-        visibility = random.randint(5, 15)
-        
-        message_parts.append(f"Humidity is {humidity} percent.")
         message_parts.append(f"Barometric pressure is {pressure:.2f} inches and {pressure_trend}.")
+        
+        # Görüş Mesafesi (Visibility)
+        visibility = random.randint(5, 15)
         message_parts.append(f"Visibility is {visibility} miles.")
+        
+        # Bulut Örtüsü (Cloud Cover)
+        cloud_cover = random.choice([
+            "clear skies",
+            "mostly clear",
+            "partly cloudy",
+            "mostly cloudy",
+            "overcast"
+        ])
+        message_parts.append(f"Cloud cover is {cloud_cover}.")
+        
+        # Yağış Durumu
+        precip_status = random.choice([
+            "No precipitation expected in the past hour.",
+            "Light rain showers have been reported.",
+            "Scattered showers in the area.",
+            "Snow flurries observed.",
+            "Drizzle reported at nearby stations."
+        ])
+        message_parts.append(precip_status)
+        
+        # UV İndeksi (Gündüz ise)
+        hour = now.hour
+        if 8 <= hour <= 17:
+            uv_index = random.randint(0, 10)
+            uv_category = "low"
+            if uv_index >= 8:
+                uv_category = "very high"
+            elif uv_index >= 6:
+                uv_category = "high"
+            elif uv_index >= 3:
+                uv_category = "moderate"
+            message_parts.append(f"UV index is {uv_index}, which is {uv_category}.")
+        
+        # Ek Bilgiler (opsiyonel)
+        message_parts.append(f"Additional observations from nearby stations:")
+        
+        # 2-3 rastgele ek istasyon
+        extra_stations = [
+            {"name": "Crested Butte", "temp": random.randint(20, 40), "wind": random.randint(5, 15)},
+            {"name": "Monarch Pass", "temp": random.randint(15, 35), "wind": random.randint(10, 25)},
+            {"name": "Lake City", "temp": random.randint(25, 45), "wind": random.randint(5, 10)},
+        ]
+        
+        for station in extra_stations:
+            message_parts.append(
+                f"At {station['name']}, temperature is {station['temp']} degrees, "
+                f"winds at {station['wind']} miles per hour."
+            )
+        
+        # Kapanış
+        message_parts.append(f"This concludes the hourly weather roundup for {city} at {time_str} {tz}.")
         
         return ' '.join(message_parts)
     
@@ -383,7 +516,7 @@ class NOAAWeatherRadio:
             return "Zone forecast not available."
     
     # ============================================================
-    # 6. TOM - HAZARDOUS WEATHER OUTLOOK (DÜZELTİLDİ)
+    # 6. TOM - HAZARDOUS WEATHER OUTLOOK
     # ============================================================
     def get_hazardous_outlook(self, data):
         if not data:
@@ -458,20 +591,119 @@ class NOAAWeatherRadio:
         return ' '.join(forecast.split())
     
     # ============================================================
-    # 8. TOM - CLIMATE SUMMARY
+    # 8. TOM/DONNA - COASTAL WATER OBSERVATIONS
+    # ============================================================
+    def get_coastal_water_observations(self):
+        """Kıyı suları gözlemleri - UZUN ve detaylı - Tom veya Donna"""
+        now = datetime.now()
+        time_str = now.strftime("%I:%M %p")
+        day_str = now.strftime("%A")
+        date_str = now.strftime("%B %d, %Y")
+        
+        # Rastgele ses seç (Tom veya Donna)
+        voice = random.choice(["tom", "donna"])
+        
+        # Rastgele değerler (gerçek NOAA verilerini taklit eder)
+        stations = [
+            {"name": "Station 44025 - Long Island Sound", "lat": "41.0N", "lon": "72.0W"},
+            {"name": "Station 44065 - New York Harbor", "lat": "40.5N", "lon": "73.8W"},
+            {"name": "Station 44017 - Atlantic City", "lat": "39.0N", "lon": "74.0W"},
+            {"name": "Station 44020 - Nantucket Sound", "lat": "41.5N", "lon": "70.0W"},
+            {"name": "Station 44025 - Block Island", "lat": "41.2N", "lon": "71.5W"},
+        ]
+        
+        # 3 istasyon seç
+        selected_stations = random.sample(stations, min(3, len(stations)))
+        
+        observations = []
+        
+        for station in selected_stations:
+            wind_speed = random.randint(10, 30)
+            wind_gust = wind_speed + random.randint(5, 15)
+            wind_dir = random.choice(["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"])
+            wave_height = random.randint(3, 10)
+            wave_period = random.randint(5, 12)
+            temp_air = random.randint(50, 75)
+            temp_water = random.randint(45, 70)
+            pressure = random.uniform(29.85, 30.25)
+            pressure_trend = random.choice(["rising", "falling", "steady"])
+            visibility = random.randint(5, 15)
+            humidity = random.randint(40, 80)
+            
+            sea_state = random.choice([
+                "smooth to slight",
+                "slight to moderate",
+                "moderate",
+                "moderate to rough",
+                "rough",
+                "very rough"
+            ])
+            
+            observation = f"""
+            {station['name']} at {time_str} {day_str}:
+            Location: {station['lat']} {station['lon']}.
+            Winds: {wind_dir} at {wind_speed} knots, gusting to {wind_gust} knots.
+            Seas: {wave_height} feet with a dominant wave period of {wave_period} seconds.
+            Sea state: {sea_state}.
+            Air temperature: {temp_air} degrees Fahrenheit.
+            Sea surface temperature: {temp_water} degrees Fahrenheit.
+            Barometric pressure: {pressure:.2f} inches and {pressure_trend}.
+            Visibility: {visibility} miles.
+            Humidity: {humidity} percent.
+            """
+            observations.append(observation)
+        
+        summary = f"""
+        Coastal water observations for the coastal waters,
+        issued at {time_str} {day_str}, {date_str}.
+        
+        The following observations are from the National Data Buoy Center
+        and the Coastal Marine Automated Network.
+        
+        {' '.join(observations)}
+        
+        Additional coastal information:
+        - Tidal range: {random.choice(['2 to 4 feet', '3 to 5 feet', '1 to 3 feet'])}.
+        - Current speed: {random.randint(1, 5)} knots.
+        - Current direction: {random.choice(['northward', 'southward', 'eastward', 'westward'])}.
+        - Water visibility: {random.randint(5, 15)} miles.
+        
+        Mariners are advised to exercise caution due to
+        {random.choice([
+            'reduced visibility in fog',
+            'increasing winds and seas',
+            'rough seas and strong currents',
+            'possible thunderstorms',
+            'small craft advisory in effect'
+        ])}.
+        
+        This concludes the coastal water observations report.
+        """
+        
+        return ' '.join(summary.split()), voice
+    
+    # ============================================================
+    # 9. TOM - CLIMATE SUMMARY
     # ============================================================
     def get_climate_summary(self, data):
+        """İklim özeti - TOM okur"""
         if not data:
             return "Climate summary not available."
         
         forecast = data.get('forecast', {})
         city = self.city
+        state = self.state
         
         now = datetime.now()
-        today = now.strftime("%A")
+        time_str = now.strftime("%I:%M %p")
+        date_str = now.strftime("%B %d, %Y")
+        day_str = now.strftime("%A")
         
+        # ============ SICAKLIK VERİLERİ ============
         max_temp = 0
         min_temp = 100
+        precip_today = 0
+        total_precip = 0
         
         if forecast and 'properties' in forecast:
             periods = forecast['properties']['periods']
@@ -484,26 +716,113 @@ class NOAAWeatherRadio:
                         min_temp = temp
         
         if max_temp == 0:
-            max_temp = random.randint(55, 75)
+            max_temp = random.randint(55, 85)
         if min_temp == 100:
-            min_temp = random.randint(25, 45)
+            min_temp = random.randint(25, 55)
         
-        day_length = random.randint(10, 14)
-        sunrise = random.choice(["6:15 AM", "6:30 AM", "6:45 AM", "7:00 AM"])
-        sunset = random.choice(["5:45 PM", "6:00 PM", "6:15 PM", "6:30 PM"])
+        # ============ MEVSİM VE KONUMA GÖRE AYARLAR ============
+        month = now.month
+        is_summer = month in [6, 7, 8, 9]
+        is_winter = month in [12, 1, 2]
         
+        if "Phoenix" in city or "Arizona" in state:
+            normal_high = random.randint(95, 105)
+            normal_low = random.randint(70, 80)
+            record_high = random.randint(110, 120)
+            record_low = random.randint(55, 65)
+            record_year_high = random.randint(1970, 2000)
+            record_year_low = random.randint(1900, 1950)
+            precip = round(random.uniform(0.1, 2.5), 2)
+            total_precip = round(random.uniform(3.0, 15.0), 2)
+        elif "Miami" in city or "Florida" in state:
+            normal_high = random.randint(85, 95)
+            normal_low = random.randint(70, 80)
+            record_high = random.randint(100, 110)
+            record_low = random.randint(60, 70)
+            record_year_high = random.randint(1980, 2010)
+            record_year_low = random.randint(1900, 1940)
+            precip = round(random.uniform(0.1, 5.0), 2)
+            total_precip = round(random.uniform(5.0, 25.0), 2)
+        elif "Denver" in city or "Colorado" in state:
+            normal_high = random.randint(65, 85)
+            normal_low = random.randint(40, 60)
+            record_high = random.randint(95, 105)
+            record_low = random.randint(20, 35)
+            record_year_high = random.randint(1970, 2000)
+            record_year_low = random.randint(1900, 1950)
+            precip = round(random.uniform(0.0, 1.5), 2)
+            total_precip = round(random.uniform(2.0, 12.0), 2)
+        elif "Seattle" in city or "Washington" in state:
+            normal_high = random.randint(60, 75)
+            normal_low = random.randint(45, 55)
+            record_high = random.randint(85, 95)
+            record_low = random.randint(25, 40)
+            record_year_high = random.randint(1970, 2000)
+            record_year_low = random.randint(1900, 1950)
+            precip = round(random.uniform(0.1, 3.0), 2)
+            total_precip = round(random.uniform(8.0, 30.0), 2)
+        elif "Chicago" in city or "Illinois" in state:
+            normal_high = random.randint(70, 85)
+            normal_low = random.randint(55, 65)
+            record_high = random.randint(95, 105)
+            record_low = random.randint(30, 45)
+            record_year_high = random.randint(1970, 2000)
+            record_year_low = random.randint(1900, 1950)
+            precip = round(random.uniform(0.0, 2.0), 2)
+            total_precip = round(random.uniform(3.0, 18.0), 2)
+        else:
+            normal_high = random.randint(70, 90)
+            normal_low = random.randint(45, 65)
+            record_high = random.randint(100, 110)
+            record_low = random.randint(30, 45)
+            record_year_high = random.randint(1970, 2000)
+            record_year_low = random.randint(1900, 1950)
+            precip = round(random.uniform(0.0, 1.5), 2)
+            total_precip = round(random.uniform(2.0, 15.0), 2)
+        
+        # ============ GÜN DOĞUMU / BATIMI ============
+        hour = now.hour
+        if 6 <= hour < 12:
+            time_period = "morning"
+        elif 12 <= hour < 17:
+            time_period = "afternoon"
+        elif 17 <= hour < 21:
+            time_period = "evening"
+        else:
+            time_period = "night"
+        
+        sunrise = random.choice(["6:08 AM", "6:15 AM", "6:30 AM", "6:45 AM", "7:00 AM"])
+        sunset = random.choice(["5:45 PM", "6:00 PM", "6:15 PM", "6:30 PM", "6:44 PM", "7:00 PM"])
+        
+        # ============ ANONS METNİ ============
         summary = f"""
-        Climate summary for {city}.
-        Today's forecast high is {max_temp} degrees.
-        The expected low is {min_temp} degrees.
-        Day length is approximately {day_length} hours.
-        Sunrise at {sunrise}. Sunset at {sunset}.
+        The {city}, {state} climate summary for
+        this {time_period}, as of {time_str}. {date_str}.
+        
+        Today's high temperature was {max_temp} degrees.
+        The normal high is {normal_high} degrees.
+        The record high is {record_high} degrees which was set in {record_year_high}.
+        
+        Today's low temperature was {min_temp} degrees.
+        The normal low is {normal_low} degrees.
+        The record low is {record_low} degrees which was set in {record_year_low}.
+        
+        {precip} inches of precipitation fell today,
+        which brings the monthly total to {total_precip:.2f} inches.
+        
+        The total precipitation for the year now stands at {total_precip + random.uniform(2.0, 10.0):.2f} inches.
+        
+        The normal high temperature for tomorrow is {normal_high + random.randint(-5, 5)} degrees,
+        and the normal low is {normal_low + random.randint(-5, 5)}.
+        
+        Sunset tonight is at {sunset},
+        sunrise tomorrow is at {sunrise}.
         """
         
         return ' '.join(summary.split())
     
     # ============================================================
-    # EMERGENCY SYSTEM
+    # 10. EMERGENCY SYSTEM
     # ============================================================
     def check_for_emergency(self, alerts_data):
         if not alerts_data or 'features' not in alerts_data:
@@ -514,7 +833,11 @@ class NOAAWeatherRadio:
             'hurricane', 'extreme wind', 'blizzard', 'ice storm',
             'tsunami', 'wildfire', 'volcano', 'extreme heat',
             'dust storm', 'winter storm', 'flood', 'landslide',
-            'evacuation', 'civil emergency', 'shelter in place'
+            'evacuation', 'civil emergency', 'shelter in place',
+            'avalanche', 'heavy snow', 'freezing rain', 'extreme cold',
+            'advisory', 'watch', 'statement', 'special weather',
+            'small craft', 'high wind', 'freeze', 'frost',
+            'dense fog', 'air quality', 'red flag'
         ]
         
         for alert in alerts_data['features']:
@@ -532,12 +855,15 @@ class NOAAWeatherRadio:
             )
             
             if is_emergency:
+                area = props.get('areaDesc', 'this area')
+                area_clean = self.clean_area(area)
+                
                 return {
                     'event': props.get('event', 'Emergency'),
                     'severity': severity,
                     'urgency': urgency,
                     'category': category,
-                    'area': props.get('areaDesc', 'this area'),
+                    'area': area_clean,
                     'headline': props.get('headline', ''),
                     'description': props.get('description', ''),
                     'instruction': props.get('instruction', '')
@@ -553,6 +879,164 @@ class NOAAWeatherRadio:
             return True
         except:
             return False
+    
+    # ============================================================
+    # 11. TEST SYSTEM
+    # ============================================================
+    def is_test_time(self):
+        now = datetime.now()
+        weekday = now.weekday()
+        hour = now.hour
+        minute = now.minute
+        day = now.day
+        
+        if weekday == 2 and 11 <= hour < 12:
+            test_minute = 15 + (day * 3) % 30
+            if minute >= test_minute - 2 and minute <= test_minute + 2:
+                return True, "Weekly Test"
+        
+        if weekday == 2 and day <= 7:
+            if 11 <= hour < 12:
+                test_minute = 30 + (day * 2) % 20
+                if minute >= test_minute - 2 and minute <= test_minute + 2:
+                    return True, "Monthly Test"
+        
+        return False, None
+    
+    def get_test_message(self, test_type):
+        now = datetime.now()
+        date_str = now.strftime("%A, %B %d, %Y")
+        time_str = now.strftime("%I:%M %p")
+        
+        if test_type == "Weekly Test":
+            return f"""
+            This is a weekly test of the NOAA Weather Radio system.
+            {date_str} at {time_str}.
+            This is only a test. If this had been an actual emergency,
+            you would have been provided with important information.
+            This concludes the weekly test of the NOAA Weather Radio system.
+            """
+        elif test_type == "Monthly Test":
+            return f"""
+            This is a monthly test of the NOAA Weather Radio system.
+            {date_str} at {time_str}.
+            This is only a test. If this had been an actual emergency,
+            you would have been provided with important information.
+            This concludes the monthly test of the NOAA Weather Radio system.
+            """
+        else:
+            return f"""
+            This is a test of the NOAA Weather Radio system.
+            {date_str} at {time_str}.
+            This is only a test.
+            """
+    
+    def play_test_alert(self):
+        try:
+            for _ in range(3):
+                winsound.Beep(600, 300)
+                time.sleep(0.2)
+            return True
+        except:
+            return False
+    
+    # ============================================================
+    # 11. TEST SYSTEM
+    # ============================================================
+    def is_test_time(self):
+        now = datetime.now()
+        weekday = now.weekday()
+        hour = now.hour
+        minute = now.minute
+        day = now.day
+        
+        if weekday == 2 and 11 <= hour < 12:
+            test_minute = 15 + (day * 3) % 30
+            if minute >= test_minute - 2 and minute <= test_minute + 2:
+                return True, "Weekly Test"
+        
+        if weekday == 2 and day <= 7:
+            if 11 <= hour < 12:
+                test_minute = 30 + (day * 2) % 20
+                if minute >= test_minute - 2 and minute <= test_minute + 2:
+                    return True, "Monthly Test"
+        
+        return False, None
+    
+    def get_test_message(self, test_type):
+        now = datetime.now()
+        date_str = now.strftime("%A, %B %d, %Y")
+        time_str = now.strftime("%I:%M %p")
+        
+        if test_type == "Weekly Test":
+            return f"""
+            This is a weekly test of the NOAA Weather Radio system.
+            {date_str} at {time_str}.
+            This is only a test. If this had been an actual emergency,
+            you would have been provided with important information.
+            This concludes the weekly test of the NOAA Weather Radio system.
+            """
+        elif test_type == "Monthly Test":
+            return f"""
+            This is a monthly test of the NOAA Weather Radio system.
+            {date_str} at {time_str}.
+            This is only a test. If this had been an actual emergency,
+            you would have been provided with important information.
+            This concludes the monthly test of the NOAA Weather Radio system.
+            """
+        else:
+            return f"""
+            This is a test of the NOAA Weather Radio system.
+            {date_str} at {time_str}.
+            This is only a test.
+            """
+    
+    def play_test_alert(self):
+        try:
+            for _ in range(3):
+                winsound.Beep(750, 250)
+                time.sleep(0.1)
+                winsound.Beep(500, 250)
+                time.sleep(0.1)
+            return True
+        except:
+            return False
+    
+    def run_test(self, test_type):
+        print(f"\n🔊 {test_type} BAŞLATILIYOR!")
+        
+        self.play_test_alert()
+        time.sleep(1)
+        
+        test_msg = self.get_test_message(test_type)
+        
+        if self.harry_voice:
+            self.speak_with_voice(test_msg, "harry", 1)
+        else:
+            self.speak_with_voice(test_msg, "paul", 0)
+        
+        time.sleep(1)
+        self.play_test_alert()
+        
+        print(f"✅ {test_type} TAMAMLANDI!")
+        
+        return True
+    
+    def check_and_run_test(self):
+        if not self.test_mode:
+            return False
+        
+        is_test, test_type = self.is_test_time()
+        
+        if is_test:
+            now = time.time()
+            if now - self.last_test_time > 120:
+                self.last_test_time = now
+                self.last_test_type = test_type
+                self.run_test(test_type)
+                return True
+        
+        return False
     
     # ============================================================
     # TEXT CLEANING
