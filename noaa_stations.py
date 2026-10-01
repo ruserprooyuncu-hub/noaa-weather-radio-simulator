@@ -4,7 +4,7 @@
 NOAA_STATIONS = {}
 
 # ============ ALABAMA (10) ============
-NOAA_STATIONS["Birmingham"] = {"callsign": "KIH54", "frequency": "162.550", "lat": 33.5186, "lon": -86.8104, "city": "Birmingham", "state": "Alabama", "region": "southeast", "station_id": "WNG627", "description": "Birmingham Metro Area", "voice": "tom"}
+NOAA_STATIONS["Birmingham"] = {"callsign": "KIH54", "frequency": "162.550", "lat": 33.5186, "lon": -86.8104, "city": "Birmingham", "state": "Alabama", "region": "southeast", "station_id": "WNG627", "description": "Birmingham Metro Area", "voice": "harry"}
 NOAA_STATIONS["Mobile"] = {"callsign": "KIH49", "frequency": "162.550", "lat": 30.6954, "lon": -88.0399, "city": "Mobile", "state": "Alabama", "region": "coastal", "station_id": "WNG629", "description": "Mobile Bay, Gulf Coast", "voice": "paul"}
 NOAA_STATIONS["Huntsville"] = {"callsign": "KIH57", "frequency": "162.475", "lat": 34.7304, "lon": -86.5861, "city": "Huntsville", "state": "Alabama", "region": "southeast", "station_id": "WNG631", "description": "Huntsville Metro, Tennessee Valley", "voice": "harry"}
 NOAA_STATIONS["Montgomery"] = {"callsign": "KIH55", "frequency": "162.525", "lat": 32.3668, "lon": -86.3000, "city": "Montgomery", "state": "Alabama", "region": "southeast", "station_id": "WNG633", "description": "Montgomery Metro Area", "voice": "tom"}
